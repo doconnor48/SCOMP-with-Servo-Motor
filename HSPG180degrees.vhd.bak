@@ -1,0 +1,71 @@
+-- HSPG.vhd (hobby servo pulse generator)
+-- This starting point generates a pulse between 100 us and something much longer than 2.5 ms.
+
+library IEEE;
+use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
+
+entity HSPG is
+    port(
+        CS          : in  std_logic;
+        IO_WRITE    : in  std_logic;
+        IO_DATA     : in  std_logic_vector(15 downto 0);
+        CLOCK       : in  std_logic;
+        RESETN      : in  std_logic;
+        PULSE1      : out std_logic;
+		  PULSE2		  : out std_logic;
+		  PULSE3		  : out std_logic;
+		  PULSE4		  : out std_logic;
+		  );
+end HSPG;
+
+architecture a of HSPG is
+
+    signal command    : std_logic_vector(15 downto 0);  -- command sent from SCOMP
+    signal count      : unsigned(17 downto 0);          -- internal counter
+    signal PulseWidth : unsigned(17 downto 0);          -- pulse width
+
+begin
+
+    -- Latch data on rising edge of CS
+    process (RESETN, CS) begin
+        if RESETN = '0' then
+            command <= (others => '0');
+        elsif IO_WRITE = '1' and rising_edge(CS) then
+            command <= IO_DATA;
+        end if;
+    end process;
+
+    -- Determine PulseWidth based on command
+    process(command) begin
+        if command = "0000000000000001" then
+            PulseWidth <= to_unsigned(28800, 18); -- 5760 (in decimal)
+        elsif command = x"0000" then
+            PulseWidth <= to_unsigned(7200, 18);  -- 1400 (in decimal)
+        else
+            PulseWidth <= (others => '0');         -- Default case
+        end if;
+    end process;
+
+    -- Generate pulse based on PulseWidth
+    process (RESETN, CLOCK)
+    begin
+        if (RESETN = '0') then
+            count <= (others => '0');
+            PULSE1 <= '0';
+        elsif rising_edge(CLOCK) then
+            if count < PulseWidth then
+                PULSE1 <= '1';
+            else
+                PULSE1 <= '0';
+            end if;
+
+            if count = to_unsigned(240000, 18) then  -- Max count value
+                count <= (others => '0');
+            else
+                count <= count + 1;
+            end if;
+        end if;
+    end process;
+
+end a;
